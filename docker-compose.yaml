@@ -1,0 +1,25 @@
+version: '3'
+
+networks:
+  my-test-bridge:
+
+services:
+  pinger:
+    restart: always
+    image: nicgrobler/pinger:latest
+    command: /go/bin/pinger
+    environment:
+      - ID=$ID
+      - MAXID=$MAXID
+      - BASENAME=$BASENAME
+      - SEPERATOR=$SEPERATOR
+      - GELF_URL=$GELF_URL
+      - CYCLE_TIME_SECONDS=$CYCLE_TIME_SECONDS
+      - CONNECTION_TIMEOUT_SECONDS=$CONNECTION_TIMEOUT_SECONDS
+      - IDLE_CONNECTION_TIMEOUT_SECONDS=$IDLE_CONNECTION_TIMEOUT_SECONDS
+      - PORT=$PORT
+    networks:
+      my-test-bridge:
+        aliases:
+          - $BASENAME$SEPERATOR$ID
+    env_file: .env
