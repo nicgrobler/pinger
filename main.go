@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -22,30 +23,58 @@ const (
 )
 
 type config struct {
-	MyID                   int
-	MaxID                  int
-	BaseName               string
-	MyName                 string
-	Seperator              string
-	ConnectionCloseTimeout time.Duration
-	IdleConnectionTimeout  time.Duration
-	CycleTime              time.Duration
+	ConnectionCloseTimeout int
+	IdleConnectionTimeout  int
+	StartupRetries         int
+	StartupRetryDelay      int
+	CycleTime              int
 	Port                   string
 	URL                    string
 }
 
 type peers map[string]int
 
-func getValidPeerList(c config) (peers, error) {
+func getValidPeerList(c *config) (peers, error) {
 	p := make(peers)
-	for i := 1; i <= c.MaxID; i++ {
-		if i != c.MyID {
-			p[c.BaseName+c.Seperator+strconv.Itoa(i)] = 0
+	// get my own hostname
+	myName, err := getHostName()
+	if err != nil {
+		return p, errors.New("failed to get own host name: " + err.Error())
+	}
+
+	// get my own ips as a map
+	ips, err := getMyIPs(myName)
+	if err != nil {
+		return p, errors.New("failed to get own ips: " + err.Error())
+	}
+
+	// get the list of IPs for all tasks sitting behind our service - ignore error here as can fail at startup / scale operations
+	others, err := net.LookupIP("tasks.testpinger_pinger.")
+
+	if err != nil {
+		// retry several times if needed
+		for i := 0; i < c.StartupRetries; i++ {
+			others, err = net.LookupIP("tasks.testpinger_pinger.")
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(c.StartupRetryDelay) * time.Second)
 		}
 	}
-	if len(p) == 0 {
-		return p, errors.New("not enough peernames supplied")
+
+	if err != nil {
+		return p, errors.New("failed to get tasks: " + err.Error())
 	}
+
+	// build list of task ips, that do not include our own
+	for _, ip := range others {
+		ipString := ip.String()
+		_, found := ips[ipString]
+		if !found {
+			p[ipString] = 1
+		}
+	}
+
 	return p, nil
 }
 
@@ -70,7 +99,7 @@ func signalContext() context.Context {
 
 }
 
-func alerter(c context.Context, cfg config, errorChannel chan error) {
+func alerter(c context.Context, cfg *config, errorChannel chan error) {
 	// split logs to logger and gelf IF we were given a URL
 	if cfg.URL != "" {
 		graylogAddr := cfg.URL
@@ -104,51 +133,57 @@ func alerter(c context.Context, cfg config, errorChannel chan error) {
 	}
 }
 
-func addEnvToConfig(c *config) {
+func getHostName() (string, error) {
+	return os.Hostname()
+}
 
-	basename := os.Getenv("BASENAME")
-	if basename != "" {
-		c.BaseName = basename
-	} else {
-		c.BaseName = "pinger"
+func getMyIPs(name string) (map[string]string, error) {
+	ips := make(map[string]string)
+
+	myIPs, err := net.LookupIP(name)
+	if err != nil {
+		return ips, err
 	}
-
-	seperator := os.Getenv("SEPERATOR")
-	if seperator != "" {
-		c.Seperator = seperator
-	} else {
-		c.BaseName = "_"
+	for i := range myIPs {
+		x := myIPs[i].String()
+		ips[x] = x
 	}
+	return ips, nil
+}
 
-	id := os.Getenv("ID")
-	if id != "" {
-		s, err := strconv.Atoi(id)
-		if err != nil {
-			log.Fatalf("invalid value passed for ID: %s", err.Error())
-		}
-		c.MyID = s
-	} else {
-		c.MyID = 1
-	}
+func getConfig() *config {
 
-	maxid := os.Getenv("MAXID")
-	if maxid != "" {
-		s, err := strconv.Atoi(maxid)
-		if err != nil {
-			log.Fatalf("invalid value passed for MAXID: %s", err.Error())
-		}
-		c.MaxID = s
-	} else {
-		c.MaxID = 10
-	}
+	c := &config{}
 
-	timeoutString := os.Getenv("CONNECTION_TIMEOUT_SECONDS")
+	timeoutString := os.Getenv("STARTUP_RETRIES")
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for CONNECTION_CLOSE_TIME_LIMIT: %s", err.Error())
+			log.Fatalf("invalid value passed for STARTUP_RETRIES: %s", err.Error())
 		}
-		c.ConnectionCloseTimeout = time.Duration(s) * time.Second
+		c.StartupRetries = s
+	} else {
+		c.StartupRetries = 1
+	}
+
+	timeoutString = os.Getenv("STARTUP_RETRIES_DELAY_SECONDS")
+	if timeoutString != "" {
+		s, err := strconv.Atoi(timeoutString)
+		if err != nil {
+			log.Fatalf("invalid value passed for STARTUP_RETRIES_DELAY_SECONDS: %s", err.Error())
+		}
+		c.StartupRetryDelay = s
+	} else {
+		c.StartupRetryDelay = 1
+	}
+
+	timeoutString = os.Getenv("CONNECTION_TIMEOUT_SECONDS")
+	if timeoutString != "" {
+		s, err := strconv.Atoi(timeoutString)
+		if err != nil {
+			log.Fatalf("invalid value passed for CONNECTION_TIMEOUT_SECONDS: %s", err.Error())
+		}
+		c.ConnectionCloseTimeout = s
 	} else {
 		c.ConnectionCloseTimeout = 1
 	}
@@ -157,9 +192,9 @@ func addEnvToConfig(c *config) {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for CONNECTION_CLOSE_TIME_LIMIT: %s", err.Error())
+			log.Fatalf("invalid value passed for IDLE_CONNECTION_TIMEOUT_SECONDS: %s", err.Error())
 		}
-		c.IdleConnectionTimeout = time.Duration(s) * time.Second
+		c.IdleConnectionTimeout = s
 	} else {
 		c.IdleConnectionTimeout = 1
 	}
@@ -168,9 +203,9 @@ func addEnvToConfig(c *config) {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for CONNECTION_CLOSE_TIME_LIMIT: %s", err.Error())
+			log.Fatalf("invalid value passed for CYCLE_TIME_SECONDS: %s", err.Error())
 		}
-		c.CycleTime = time.Duration(s) * time.Second
+		c.CycleTime = s
 	} else {
 		c.CycleTime = 10
 	}
@@ -179,34 +214,21 @@ func addEnvToConfig(c *config) {
 	if portString != "" {
 		c.Port = portString
 	} else {
-		c.Port = "8123"
+		c.Port = "8111"
 	}
 
 	c.URL = os.Getenv("GELF_URL")
 
-	c.MyName = buildName(c.Seperator, c.BaseName, c.MyID)
-}
-
-func buildName(seperator, basename string, id int) string {
-	return basename + seperator + strconv.Itoa(id)
+	return c
 }
 
 func main() {
 
-	c := config{}
-
-	// add environment variables to config
-	addEnvToConfig(&c)
-
-	peerList, err := getValidPeerList(c)
-	if err != nil {
-		log.Fatalf("stopping due to error: %s", err.Error())
-		return
-	}
+	c := getConfig()
 
 	ctx := signalContext()
 
-	errorChannel := make(chan error, c.MaxID)
+	errorChannel := make(chan error, 20)
 	go alerter(ctx, c, errorChannel)
 
 	// dispatch all and wait...
@@ -214,13 +236,14 @@ func main() {
 	wg.Add(2)
 
 	go func(w *sync.WaitGroup) {
-		startServer(ctx, c, peerList, errorChannel)
+		startServer(ctx, c, errorChannel)
 		wg.Done()
 	}(&wg)
 	go func(w *sync.WaitGroup) {
-		startClient(ctx, c, peerList, errorChannel)
+		startClient(ctx, c, errorChannel)
 		wg.Done()
 	}(&wg)
 	// now block and wait
 	wg.Wait()
+
 }

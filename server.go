@@ -10,24 +10,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type peer struct {
-	Name string `json:"name"`
-}
-
 type status struct {
 	Status string `json:"status"`
 }
 
-func handler(w http.ResponseWriter, r *http.Request, p peers, c config) {
+func handler(w http.ResponseWriter, r *http.Request, c *config) {
 
 	switch r.Method {
-	case "GET":
-		me := peer{Name: c.MyName}
-		if err := json.NewEncoder(w).Encode(me); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-
-	case "POST":
+	case "GET", "POST":
 		s := status{Status: "ok"}
 		if err := json.NewEncoder(w).Encode(s); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,9 +40,9 @@ type HttpServer struct {
 }
 
 // NewHTTPServer takes a valid address - can be of form IP:Port, or :Port - and returns a server
-func NewHTTPServer(description, address string, errorChannel chan error, c config) *HttpServer {
+func NewHTTPServer(description, address string, errorChannel chan error, c *config) *HttpServer {
 	s := &HttpServer{slug: description, address: address, Done: make(chan error), router: http.NewServeMux(), errorChannel: errorChannel}
-	s.setListener(&http.Server{Addr: address, Handler: s.router, IdleTimeout: c.IdleConnectionTimeout})
+	s.setListener(&http.Server{Addr: address, Handler: s.router, IdleTimeout: time.Duration(c.IdleConnectionTimeout) * time.Second})
 	return s
 }
 
@@ -103,11 +93,11 @@ func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
 	close(s.Done)
 }
 
-func startServer(ctx context.Context, c config, p peers, errorChannel chan error) {
+func startServer(ctx context.Context, c *config, errorChannel chan error) {
 
 	// initialise http listener
 	httpServer := NewHTTPServer("http listener", "0.0.0.0:"+c.Port, errorChannel, c)
-	httpServer.RegisterHandler(ENDPOINT, func(w http.ResponseWriter, r *http.Request) { handler(w, r, p, c) })
+	httpServer.RegisterHandler(ENDPOINT, func(w http.ResponseWriter, r *http.Request) { handler(w, r, c) })
 
 	// run http server's listener
 	go httpServer.StartListener(ctx, time.Duration(c.ConnectionCloseTimeout))

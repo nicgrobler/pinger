@@ -5,21 +5,21 @@ networks:
 
 services:
   pinger:
-    restart: always
-    image: nicgrobler/pinger:latest
+    image: nicgrobler/pinger:v1.0.0
+    deploy:
+      replicas: 3 
+    env_file:
+      - .env
     command: /go/bin/pinger
     environment:
-      - ID=$ID
-      - MAXID=$MAXID
-      - BASENAME=$BASENAME
-      - SEPERATOR=$SEPERATOR
       - GELF_URL=$GELF_URL
+      - STARTUP_RETRIES=$STARTUP_RETRIES
+      - STARTUP_RETRIES_DELAY_SECONDS=$STARTUP_RETRIES_DELAY_SECONDS
+      - STACK_NAME=$STACK_NAME
       - CYCLE_TIME_SECONDS=$CYCLE_TIME_SECONDS
       - CONNECTION_TIMEOUT_SECONDS=$CONNECTION_TIMEOUT_SECONDS
       - IDLE_CONNECTION_TIMEOUT_SECONDS=$IDLE_CONNECTION_TIMEOUT_SECONDS
       - PORT=$PORT
     networks:
       my-test-bridge:
-        aliases:
-          - $BASENAME$SEPERATOR$ID
-    env_file: .env
+          

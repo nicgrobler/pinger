@@ -17,9 +17,20 @@ type HTTPClient struct {
 	errorChannel chan error
 }
 
-func doConnect(host string, errorChannel chan error, c config, wg *sync.WaitGroup) {
+func doConnect(ip string, errorChannel chan error, c *config, wg *sync.WaitGroup) {
 	defer wg.Done()
 	client := getClient(errorChannel, c)
+	// as testing name resolution as well as connectivity, perform addr resolution first
+	name, err := net.LookupAddr(ip)
+	if err != nil {
+		client.errorChannel <- errors.New(ERROR_PREFIX + err.Error())
+		return
+	}
+	// chop off the last '.' from the address
+	host := name[0]
+	if host[len(host)-1] == byte('.') {
+		host = host[0 : len(host)-1]
+	}
 	url := "http://" + host + ":" + c.Port + ENDPOINT
 	response, err := client.c.Get(url)
 	if err != nil {
@@ -37,15 +48,15 @@ func doConnect(host string, errorChannel chan error, c config, wg *sync.WaitGrou
 	client.errorChannel <- errors.New(OK_PREFIX + url + " - returned ok")
 }
 
-func getClient(errorChannel chan error, c config) HTTPClient {
+func getClient(errorChannel chan error, c *config) HTTPClient {
 	netTransport := &http.Transport{
 		Dial: (&net.Dialer{
-			Timeout: c.ConnectionCloseTimeout,
+			Timeout: time.Duration(c.ConnectionCloseTimeout) * time.Second,
 		}).Dial,
-		TLSHandshakeTimeout: c.ConnectionCloseTimeout,
+		TLSHandshakeTimeout: time.Duration(c.ConnectionCloseTimeout) * time.Second,
 	}
 	netClient := &http.Client{
-		Timeout:   c.ConnectionCloseTimeout,
+		Timeout:   time.Duration(c.ConnectionCloseTimeout) * time.Second,
 		Transport: netTransport,
 	}
 
@@ -53,13 +64,19 @@ func getClient(errorChannel chan error, c config) HTTPClient {
 
 }
 
-func gather(con context.Context, c config, p peers, errorChannel chan error) {
+func gather(con context.Context, c *config, errorChannel chan error) {
 
 	wg := sync.WaitGroup{}
-	cycle := time.NewTicker(c.CycleTime)
+	cycle := time.NewTicker(time.Duration(c.CycleTime) * time.Second)
 	log.Info("starting clients...")
 
 	for {
+		p, err := getValidPeerList(c)
+		if err != nil {
+			errorChannel <- err
+			log.Error("client stopping due to error")
+			return
+		}
 		// should we exit or not
 		select {
 		case <-cycle.C:
@@ -77,8 +94,8 @@ func gather(con context.Context, c config, p peers, errorChannel chan error) {
 	}
 }
 
-func startClient(ctx context.Context, c config, p peers, errorChannel chan error) {
+func startClient(ctx context.Context, c *config, errorChannel chan error) {
 	// start the gather with cycle time - this will block here
-	gather(ctx, c, p, errorChannel)
+	gather(ctx, c, errorChannel)
 	log.Info("client stopped")
 }

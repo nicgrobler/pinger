@@ -1,4 +1,5 @@
 FROM golang:1.13.8 as build-env
+
 RUN mkdir /pinger
 WORKDIR /pinger
 COPY go.mod . 
