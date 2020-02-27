@@ -9,30 +9,51 @@ where the issue lies. This issue is very hard to diagnose by looking at applicat
 
 ### syntax
 
-docker-compose up -d
+docker stack deploy --compose-file docker-compose.yaml testpinger
 
 gives:
 
 ```
-<admin>$ docker-compose up -d
-Creating network "pinger_my-test-bridge" with the default driver
-Creating pinger_pinger_1 ... done
+<admin>$ docker stack deploy --compose-file docker-compose.yaml testpinger
+Creating network testpinger_my-test-bridge
+Creating service testpinger_pinger
+```
+view the service:
+```
+<admin>$docker service ps testpinger_pinger
+ID                  NAME                  IMAGE                      NODE                DESIRED STATE       CURRENT STATE           ERROR               PORTS
+lohmi5w7ypkf        testpinger_pinger.1   nicgrobler/pinger:v1.0.0   docker-desktop      Running             Running 5 minutes ago
+cppf5llddb7j        testpinger_pinger.2   nicgrobler/pinger:v1.0.0   docker-desktop      Running             Running 5 minutes ago
+i2j6tddgnke8        testpinger_pinger.3   nicgrobler/pinger:v1.0.0   docker-desktop      Running             Running 5 minutes ago
 ```
 view logs:
 ```
-<admin>$docker logs pinger_pinger_1
-time="2020-02-18T15:39:11Z" level=info msg="running with config: {1 10 pinger pinger_1 _ 1s 1s 30s 8111 }"
-time="2020-02-18T15:39:11Z" level=info msg="starting clients..."
-time="2020-02-18T15:39:11Z" level=info msg="logging to stderr only - no graylog url supplied"
-time="2020-02-18T15:39:11Z" level=info msg="http listener on: 0.0.0.0:8111"
-time="2020-02-18T15:39:41Z" level=error msg="error:Get http://pinger_2:8111/ping: dial tcp: lookup pinger_2 on 127.0.0.11:53: no such host"
-time="2020-02-18T15:39:42Z" level=error msg="error:Get http://pinger_4:8111/ping: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)"
+<admin>$docker service logs -f testpinger_pinger
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="logging to stderr only - no graylog url supplied"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="http listener on: 0.0.0.0:8111"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="starting clients..."
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="starting clients..."
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="logging to stderr only - no graylog url supplied"
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="http listener on: 0.0.0.0:8111"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="starting clients..."
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="http listener on: 0.0.0.0:8111"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:58:49Z" level=info msg="logging to stderr only - no graylog url supplied"
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:58:59Z" level=info msg="ok:http://testpinger_pinger.2.cppf5llddb7j7asz2up0679li.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:58:59Z" level=info msg="ok:http://testpinger_pinger.1.lohmi5w7ypkfajvx1upsgk2o8.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:58:59Z" level=info msg="ok:http://testpinger_pinger.3.i2j6tddgnke8ag1mhbchwyvtq.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:58:59Z" level=info msg="ok:http://testpinger_pinger.3.i2j6tddgnke8ag1mhbchwyvtq.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:58:59Z" level=info msg="ok:http://testpinger_pinger.2.cppf5llddb7j7asz2up0679li.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.1.lohmi5w7ypkfajvx1upsgk2o8.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.3.i2j6tddgnke8@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.2.cppf5llddb7j7asz2up0679li.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.3.i2j6tddgnke8ag1mhbchwyvtq.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.2.cppf5llddb7j@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.1.lohmi5w7ypkfajvx1upsgk2o8.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.3.i2j6tddgnke8ag1mhbchwyvtq.testpinger_my-test-bridge:8111/ping - returned ok"
+testpinger_pinger.1.lohmi5w7ypkf@docker-desktop    | time="2020-02-27T15:59:09Z" level=info msg="ok:http://testpinger_pinger.2.cppf5llddb7j7asz2up0679li.testpinger_my-test-bridge:8111/ping - returned ok"
 <admin>$
 ```
 finally, to stop:
 ```
-<admin>$docker-compose down
-Stopping pinger_pinger_1 ... done
-Removing pinger_pinger_1 ... done
-Removing network pinger_my-test-bridge
+<admin>$docker stack rm testpinger
+Removing service testpinger_pinger
+Removing network testpinger_my-test-bridge
 ```
