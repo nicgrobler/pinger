@@ -19,6 +19,9 @@ once done, it will send a status log entry for each - showing either an error, o
 - dns hangs
 - connection attempts to known addresses fail
 
+### setup
+
+The only requirements are that you modify the ".env" file before deploying the stack into your swarm.
 
 
 ### syntax
