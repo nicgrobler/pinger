@@ -9,6 +9,21 @@ where the issue lies. This issue is very hard to diagnose by looking at applicat
 
 ![alt text](img/docker_dns.png "Docker DNS")
 
+This code works by deploying a "pinger" service onto each node in the swarm, and each of these will discover the others of its kind (same stack) and start to attempt to:  
+
+- resolve the partner(s) address (this verifies dns)
+- connect to each partner's http listener
+
+once done, it will send a status log entry for each - showing either an error, or an ok. This means that within your logging solution (or just the service's logs) it is easy to see whether the underlying overlay network is experiencing issues. These issues include things such as:  
+
+- dns hangs
+- connection attempts to known addresses fail
+
+### setup
+
+The only requirements are that you modify the ".env" file before deploying the stack into your swarm.
+
+
 ### syntax
 
 docker stack deploy --compose-file docker-compose.yaml testpinger
