@@ -1,5 +1,6 @@
 version: '3'
 
+# change this to match one of your existing nets that you want to verify
 networks:
   my-test-bridge:
 
@@ -7,6 +8,7 @@ services:
   pinger:
     image: nicgrobler/pinger:v1.0.0
     deploy:
+      # set this as you want - scale also works when running
       replicas: 3 
     env_file:
       - .env
@@ -21,5 +23,6 @@ services:
       - IDLE_CONNECTION_TIMEOUT_SECONDS=$IDLE_CONNECTION_TIMEOUT_SECONDS
       - PORT=$PORT
     networks:
+      # change this to match one of your existing nets that you want to verify
       my-test-bridge:
           
