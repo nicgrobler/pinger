@@ -7,7 +7,7 @@ trivial to spot when containers within an overlay network lose their ability to 
 There are lots of issues which have plagued Docker Swarm overlay networks, especially when using encryption - and this simply helps to pin-point 
 where the issue lies. This issue is very hard to diagnose by looking at application logs from other containers. The diagram below shows how docker dns works:
 
-
+![alt text](img/docker_dns.png "Docker DNS")
 
 ### syntax
 
