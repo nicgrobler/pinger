@@ -21,7 +21,7 @@ once done, it will send a status log entry for each - showing either an error, o
 
 ### setup
 
-The only requirements are that you modify the ".env" file before deploying the stack into your swarm.
+The only requirements are that you modify the ".env" and "docker-compose.yaml" files before deploying the stack into your swarm. Just follow the comments within the respective files.
 
 
 ### syntax
