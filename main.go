@@ -29,7 +29,6 @@ type config struct {
 	StartupRetryDelay      int
 	CycleTime              int
 	Port                   string
-	URL                    string
 }
 
 type peers map[string]int
@@ -99,24 +98,25 @@ func signalContext() context.Context {
 
 }
 
-func alerter(c context.Context, cfg *config, errorChannel chan error) {
+func setLogging(graylogAddr string, logOutPut io.Writer) {
 	// split logs to logger and gelf IF we were given a URL
-	if cfg.URL != "" {
-		graylogAddr := cfg.URL
+	if graylogAddr != "" {
 		gelfWriter, err := gelf.NewWriter(graylogAddr)
 		// If using TCP
 		//gelfWriter, err := gelf.NewTCPWriter(graylogAddr)
 		if err != nil {
 			log.Fatalf("gelf.NewWriter: %s", err)
 		}
-		// log to both stderr and graylog2
-		log.SetOutput(io.MultiWriter(os.Stderr, gelfWriter))
+		// log to both io.writer (stderr) and graylog2
+		log.SetOutput(io.MultiWriter(logOutPut, gelfWriter))
 		log.Printf("logging to stderr & graylog2@'%s'", graylogAddr)
 
 	} else {
 		log.Info("logging to stderr only - no graylog url supplied")
 	}
+}
 
+func alerter(c context.Context, errorChannel chan error) {
 	for {
 		select {
 		case err := <-errorChannel:
@@ -151,7 +151,7 @@ func getMyIPs(name string) (map[string]string, error) {
 	return ips, nil
 }
 
-func getConfig() *config {
+func getConfig() (*config, error) {
 
 	c := &config{}
 
@@ -159,7 +159,7 @@ func getConfig() *config {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for STARTUP_RETRIES: %s", err.Error())
+			return c, errors.New("invalid value passed for STARTUP_RETRIES: " + err.Error())
 		}
 		c.StartupRetries = s
 	} else {
@@ -170,7 +170,7 @@ func getConfig() *config {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for STARTUP_RETRIES_DELAY_SECONDS: %s", err.Error())
+			return c, errors.New("invalid value passed for STARTUP_RETRIES_DELAY_SECONDS: " + err.Error())
 		}
 		c.StartupRetryDelay = s
 	} else {
@@ -181,7 +181,7 @@ func getConfig() *config {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for CONNECTION_TIMEOUT_SECONDS: %s", err.Error())
+			return c, errors.New("invalid value passed for CONNECTION_TIMEOUT_SECONDS: " + err.Error())
 		}
 		c.ConnectionCloseTimeout = s
 	} else {
@@ -192,7 +192,7 @@ func getConfig() *config {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for IDLE_CONNECTION_TIMEOUT_SECONDS: %s", err.Error())
+			return c, errors.New("invalid value passed for IDLE_CONNECTION_TIMEOUT_SECONDS: " + err.Error())
 		}
 		c.IdleConnectionTimeout = s
 	} else {
@@ -203,7 +203,7 @@ func getConfig() *config {
 	if timeoutString != "" {
 		s, err := strconv.Atoi(timeoutString)
 		if err != nil {
-			log.Fatalf("invalid value passed for CYCLE_TIME_SECONDS: %s", err.Error())
+			return c, errors.New("invalid value passed for CYCLE_TIME_SECONDS: " + err.Error())
 		}
 		c.CycleTime = s
 	} else {
@@ -217,19 +217,26 @@ func getConfig() *config {
 		c.Port = "8111"
 	}
 
-	c.URL = os.Getenv("GELF_URL")
-
-	return c
+	return c, nil
 }
 
 func main() {
 
-	c := getConfig()
+	// set logging
+	gelfUrl := os.Getenv("GELF_URL")
+	logOutput := os.Stderr
+	setLogging(gelfUrl, logOutput)
+
+	// get config
+	c, err := getConfig()
+	if err != nil {
+		log.Fatalf("startup failed due to a config error: %s", err.Error())
+	}
 
 	ctx := signalContext()
 
 	errorChannel := make(chan error, 20)
-	go alerter(ctx, c, errorChannel)
+	go alerter(ctx, errorChannel)
 
 	// dispatch all and wait...
 	wg := sync.WaitGroup{}
