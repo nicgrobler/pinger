@@ -112,7 +112,8 @@ func setLogging(graylogAddr string, logOutPut io.Writer) {
 		log.Printf("logging to stderr & graylog2@'%s'", graylogAddr)
 
 	} else {
-		log.Info("logging to stderr only - no graylog url supplied")
+		log.SetOutput(logOutPut)
+		log.Info("no graylog url supplied, will only log to default")
 	}
 }
 
