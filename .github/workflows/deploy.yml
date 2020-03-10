@@ -10,12 +10,9 @@ jobs:
     runs-on: ubuntu-latest    
     steps:
       - uses: actions/checkout@v1
-
-      - name: Login to github registry
-        uses: actions-hub/docker/login@master
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        
+      - name: Docker login
+        run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username ${{ secrets.DOCKER_PASSWORD }} --password-stdin
 
       - name: Build :tag
         if: success()
