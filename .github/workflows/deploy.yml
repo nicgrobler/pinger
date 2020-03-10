@@ -7,19 +7,17 @@ on:
 
 jobs:
   github:
-    runs-on: ubuntu-latest    
-    steps:
-      - uses: actions/checkout@v1
-        
-      - name: Docker login
-        run: echo '${{ secrets.DOCKER_PASSWORD }}' | docker login --username nicgrobler --password-stdin
+   
+- name: Login to docker hub
+  uses: actions-hub/docker/login@master
+  env:
+    DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+    DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build :tag
-        if: success()
-        run: docker build -t hub.docker.com/repository/docker/nicgrobler/${{ github.repository }}/app:${IMAGE_TAG} .
+- name: Build :latest
+  run: docker build -t ${GITHUB_REPOSITORY}:latest .
 
-      - name: Push to docker hub :tag
-        if: success()
-        uses: actions-hub/docker@master
-        with:
-          args: docker push hub.docker.com/repository/docker/nicgrobler/${{ github.repository }}/app:${IMAGE_TAG}
+- name: Push to docker hub :latest
+  uses: actions-hub/docker@master
+  with:
+    args: push ${GITHUB_REPOSITORY}:latest 
