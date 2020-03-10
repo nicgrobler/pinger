@@ -23,13 +23,19 @@ jobs:
 
       - name: Build image
         if: success()
-        run: docker build -t ${GITHUB_REPOSITORY}:${IMAGE_TAG} .
+        run: docker build -t ${GITHUB_REPOSITORY}:${IMAGE_TAG} -t ${GITHUB_REPOSITORY}:latest .
 
-      - name: Push to docker registry
+      - name: Push image teg to docker registry
         if: success()
         uses: actions-hub/docker@master
         with:
           args: push ${GITHUB_REPOSITORY}:${IMAGE_TAG}
+          
+      - name: Push latest teg to docker registry
+        if: success()
+        uses: actions-hub/docker@master
+        with:
+          args: push ${GITHUB_REPOSITORY}:latest
       
 
 
