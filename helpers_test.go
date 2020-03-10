@@ -91,6 +91,7 @@ func TestGather(t *testing.T) {
 	// set logging into custom and testable location
 	logOutput := &bytes.Buffer{}
 	config, err := getConfig()
+	config.StartupDelay = 0
 	assert.Nil(t, err)
 	setLogging("", logOutput)
 	os.Setenv("STARTUP_RETRIES", "")

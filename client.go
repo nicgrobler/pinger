@@ -68,8 +68,9 @@ func gather(con context.Context, c *config, getPeerFunc func(*config) (peers, er
 
 	wg := sync.WaitGroup{}
 	cycle := time.NewTicker(time.Duration(c.CycleTime) * time.Second)
+	log.Info("delayed startup wait...")
+	time.Sleep(time.Duration(c.StartupDelay) * time.Second)
 	log.Info("starting clients...")
-
 	for {
 		p, err := getPeerFunc(c)
 		if err != nil {

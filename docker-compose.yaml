@@ -6,7 +6,7 @@ networks:
 
 services:
   pinger:
-    image: nicgrobler/pinger:v1.0.0
+    image: nicgrobler/pinger:v3.0.0
     deploy:
       # set this as you want - scale also works when running
       replicas: 3 
@@ -15,6 +15,7 @@ services:
     command: /go/bin/pinger
     environment:
       - GELF_URL=$GELF_URL
+      - STARTUP_DELAY_SECONDS=$STARTUP_DELAY_SECONDS
       - STARTUP_RETRIES=$STARTUP_RETRIES
       - STARTUP_RETRIES_DELAY_SECONDS=$STARTUP_RETRIES_DELAY_SECONDS
       - STACK_NAME=$STACK_NAME

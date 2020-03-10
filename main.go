@@ -27,6 +27,7 @@ type config struct {
 	IdleConnectionTimeout  int
 	StartupRetries         int
 	StartupRetryDelay      int
+	StartupDelay           int
 	CycleTime              int
 	Port                   string
 }
@@ -165,6 +166,17 @@ func getConfig() (*config, error) {
 		c.StartupRetries = s
 	} else {
 		c.StartupRetries = 1
+	}
+
+	timeoutString = os.Getenv("STARTUP_DELAY_SECONDS")
+	if timeoutString != "" {
+		s, err := strconv.Atoi(timeoutString)
+		if err != nil {
+			return c, errors.New("invalid value passed for STARTUP_DELAY_SECONDS: " + err.Error())
+		}
+		c.StartupDelay = s
+	} else {
+		c.StartupDelay = 1
 	}
 
 	timeoutString = os.Getenv("STARTUP_RETRIES_DELAY_SECONDS")
