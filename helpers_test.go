@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -75,6 +77,49 @@ func TestServerStop(t *testing.T) {
 		"msg=\"http listener stopping\"",
 		"msg=\"http listener stopped\"",
 		"msg=\"server stopped\"",
+	}
+	for _, message := range messagesShouldBe {
+		assert.Contains(t, string(logOutput.Bytes()), message)
+	}
+
+}
+
+func TestGather(t *testing.T) {
+	getPeersFunc := func(c *config) (peers, error) {
+		return nil, errors.New("this is a bad error")
+	}
+	// set logging into custom and testable location
+	logOutput := &bytes.Buffer{}
+	config, err := getConfig()
+	assert.Nil(t, err)
+	setLogging("", logOutput)
+	os.Setenv("STARTUP_RETRIES", "")
+
+	// start alerter
+	errorChannel := make(chan error, 20)
+	ctx, cancel := context.WithCancel(context.Background())
+	go alerter(ctx, errorChannel)
+	go gather(ctx, config, getPeersFunc, errorChannel)
+
+	// need a delay to allow previous to actually DO something before killing them with cancel()
+	time.Sleep(1 * time.Second)
+	cancel()
+
+	c, err := getConfig()
+	assert.Nil(t, err)
+
+	// start server...
+	startServer(ctx, c, errorChannel)
+
+	// cancel context - as would happen when signalled
+	cancel()
+
+	// confirm that we got shutdown message in log
+	messagesShouldBe := []string{
+		"msg=\"http listener stopping\"",
+		"msg=\"http listener stopped\"",
+		"msg=\"server stopped\"",
+		"msg=\"this is a bad error\"",
 	}
 	for _, message := range messagesShouldBe {
 		assert.Contains(t, string(logOutput.Bytes()), message)

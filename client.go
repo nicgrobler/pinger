@@ -64,14 +64,14 @@ func getClient(errorChannel chan error, c *config) HTTPClient {
 
 }
 
-func gather(con context.Context, c *config, errorChannel chan error) {
+func gather(con context.Context, c *config, getPeerFunc func(*config) (peers, error), errorChannel chan error) {
 
 	wg := sync.WaitGroup{}
 	cycle := time.NewTicker(time.Duration(c.CycleTime) * time.Second)
 	log.Info("starting clients...")
 
 	for {
-		p, err := getValidPeerList(c)
+		p, err := getPeerFunc(c)
 		if err != nil {
 			errorChannel <- err
 			log.Error("client stopping due to error")
@@ -96,6 +96,6 @@ func gather(con context.Context, c *config, errorChannel chan error) {
 
 func startClient(ctx context.Context, c *config, errorChannel chan error) {
 	// start the gather with cycle time - this will block here
-	gather(ctx, c, errorChannel)
+	gather(ctx, c, getValidPeerList, errorChannel)
 	log.Info("client stopped")
 }
