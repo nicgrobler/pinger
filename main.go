@@ -29,6 +29,8 @@ type config struct {
 	StartupRetryDelay      int
 	StartupDelay           int
 	CycleTime              int
+	StackName              string
+	ServiceName            string
 	Port                   string
 }
 
@@ -49,12 +51,12 @@ func getValidPeerList(c *config) (peers, error) {
 	}
 
 	// get the list of IPs for all tasks sitting behind our service - ignore error here as can fail at startup / scale operations
-	others, err := net.LookupIP("tasks.testpinger_pinger.")
-
+	taskNames := "tasks." + c.ServiceName + "."
+	others, err := net.LookupIP(taskNames)
 	if err != nil {
 		// retry several times if needed
 		for i := 0; i < c.StartupRetries; i++ {
-			others, err = net.LookupIP("tasks.testpinger_pinger.")
+			others, err = net.LookupIP(taskNames)
 			if err == nil {
 				break
 			}
@@ -228,6 +230,20 @@ func getConfig() (*config, error) {
 		c.Port = portString
 	} else {
 		c.Port = "8111"
+	}
+
+	stackString := os.Getenv("STACK_NAME")
+	if stackString != "" {
+		c.StackName = stackString
+	} else {
+		c.StackName = "testpinger"
+	}
+
+	serviceString := os.Getenv("SERVICE_NAME")
+	if serviceString != "" {
+		c.ServiceName = serviceString
+	} else {
+		c.ServiceName = "pinger"
 	}
 
 	return c, nil

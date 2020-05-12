@@ -6,7 +6,7 @@ networks:
 
 services:
   pinger:
-    image: nicgrobler/pinger:v3.0.0
+    image: nicgrobler/pinger:3.0.0
     deploy:
       # set this as you want - scale also works when running
       replicas: 3 
@@ -19,6 +19,7 @@ services:
       - STARTUP_RETRIES=$STARTUP_RETRIES
       - STARTUP_RETRIES_DELAY_SECONDS=$STARTUP_RETRIES_DELAY_SECONDS
       - STACK_NAME=$STACK_NAME
+      - SERVICE_NAME=$SERVICE_NAME
       - CYCLE_TIME_SECONDS=$CYCLE_TIME_SECONDS
       - CONNECTION_TIMEOUT_SECONDS=$CONNECTION_TIMEOUT_SECONDS
       - IDLE_CONNECTION_TIMEOUT_SECONDS=$IDLE_CONNECTION_TIMEOUT_SECONDS
