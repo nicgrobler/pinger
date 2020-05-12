@@ -74,3 +74,34 @@ finally, to stop:
 Removing service testpinger_pinger
 Removing network testpinger_my-test-bridge
 ```
+### Advanced mode
+The image (dockerhub) with versions > 3.0.0 contain  an extra binary: composer
+This talks directly to the docker api, and creates the stack automatically - given the parameters in its own .env file, which is passed into the containers, and supercedes the one in this repo (it is a superset).
+
+At runtime, the binary will create a stack-per-network - for each and every network of type "overlay", with the exception of the default "ingress" network. Each non-manager node (by default) will run a container-per-network, all of which talk to partnets in the *same overlay network* as its running in.
+
+First step is to extract the pre-built binary from within the container (Linux x64 build):  
+```
+$ docker run nicgrobler/pinger:latest &
+$ docker ps
+CONTAINER ID        IMAGE                     COMMAND             CREATED             STATUS              
+e7f501f3b744        nicgrobler/pinger:latest   "/go/bin/pinger"    11 seconds ago      Up 11 seconds      
+
+$ docker cp e7f501f3b744:/go/bin/composer composer
+```
+
+The following shows how to run it:
+```
+$ ./composer
+created server: test_stack_bubbles_pinger
+created server: test_stack_bubbles_test_overlay_pinger
+```
+Then to verify:  
+```
+$ docker stack ls
+NAME                              SERVICES            ORCHESTRATOR
+test_stack_bubbles                1                   Swarm
+test_stack_bubbles_test_overlay   1                   Swarm
+```
+
+From this stage, these function as any stacks deployed using "docker stack deploy..."
