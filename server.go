@@ -4,17 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type status struct {
 	Status string `json:"status"`
 }
 
-func handler(w http.ResponseWriter, r *http.Request, c *config) {
+func handler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET", "POST":
@@ -67,11 +66,11 @@ func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
 		}
 	}()
 
-	log.Info(s.slug + " on: " + s.address)
+	log.Println(s.slug + " on: " + s.address)
 
 	<-ctx.Done()
 
-	log.Info(s.slug + " stopping")
+	log.Println(s.slug + " stopping")
 
 	ctxShutDown, cancel := context.WithTimeout(context.Background(), timeout)
 	defer func() {
@@ -79,15 +78,15 @@ func (s *HttpServer) StartListener(ctx context.Context, timeout time.Duration) {
 	}()
 
 	if err := s.listener.Shutdown(ctxShutDown); err != nil {
-		log.Warnf(s.slug+" graceful shutdown failed:%+s", err)
+		log.Println(s.slug+" graceful shutdown failed:%+s", err)
 		if e := s.listener.Close(); e != nil {
 			log.Fatalf(s.slug+" forced shutdown failed:%+s", err)
 		} else {
-			log.Info("forced shutdown ok")
+			log.Println("forced shutdown ok")
 		}
 	}
 
-	log.Info(s.slug + " stopped")
+	log.Println(s.slug + " stopped")
 
 	// let parent know that we are done
 	close(s.Done)
@@ -97,7 +96,7 @@ func startServer(ctx context.Context, c *config, errorChannel chan error) {
 
 	// initialise http listener
 	httpServer := NewHTTPServer("http listener", "0.0.0.0:"+c.Port, errorChannel, c)
-	httpServer.RegisterHandler(ENDPOINT, func(w http.ResponseWriter, r *http.Request) { handler(w, r, c) })
+	httpServer.RegisterHandler(ENDPOINT, func(w http.ResponseWriter, r *http.Request) { handler(w, r) })
 
 	// run http server's listener
 	go httpServer.StartListener(ctx, time.Duration(c.ConnectionCloseTimeout))
@@ -105,5 +104,4 @@ func startServer(ctx context.Context, c *config, errorChannel chan error) {
 	// wait for all to complete
 	<-httpServer.Done
 
-	log.Info("server stopped")
 }

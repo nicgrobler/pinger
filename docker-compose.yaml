@@ -6,7 +6,7 @@ networks:
 
 services:
   pinger:
-    image: nicgrobler/pinger:3.0.0
+    image: nicgrobler/pinger:5.0.0
     deploy:
       # set this as you want - scale also works when running
       replicas: 3 

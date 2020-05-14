@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,16 +35,15 @@ func TestAlterter(t *testing.T) {
 	assert.Equal(t, &config{}, c)
 	assert.Equal(t, "invalid value passed for STARTUP_RETRIES: strconv.Atoi: parsing \"d\": invalid syntax", err.Error())
 	// confirm that we got an error logged
-	assert.Contains(t, string(logOutput.Bytes()), "msg=\"logging to stderr & graylog2@'localhost:1234'\"")
+	assert.Contains(t, string(logOutput.Bytes()), "logging to stderr & graylog2@'localhost:1234'")
 
 }
 
 func TestHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := &http.Request{Method: "POST"}
-	c := &config{}
 
-	handler(w, r, c)
+	handler(w, r)
 
 	assert.Equal(t, "200 OK", w.Result().Status)
 
@@ -74,9 +74,8 @@ func TestServerStop(t *testing.T) {
 
 	// confirm that we got shutdown message in log
 	messagesShouldBe := []string{
-		"msg=\"http listener stopping\"",
-		"msg=\"http listener stopped\"",
-		"msg=\"server stopped\"",
+		"http listener stopping",
+		"http listener stopped",
 	}
 	for _, message := range messagesShouldBe {
 		assert.Contains(t, string(logOutput.Bytes()), message)
@@ -85,7 +84,7 @@ func TestServerStop(t *testing.T) {
 }
 
 func TestGather(t *testing.T) {
-	getPeersFunc := func(c *config) (peers, error) {
+	getPeersFunc := func(c config) (peers, error) {
 		return nil, errors.New("this is a bad error")
 	}
 	// set logging into custom and testable location
@@ -100,7 +99,9 @@ func TestGather(t *testing.T) {
 	errorChannel := make(chan error, 20)
 	ctx, cancel := context.WithCancel(context.Background())
 	go alerter(ctx, errorChannel)
-	go gather(ctx, config, getPeersFunc, errorChannel)
+	client := getClient(errorChannel, *config)
+	wg := sync.WaitGroup{}
+	go client.gather(*config, getPeersFunc, &wg)
 
 	// need a delay to allow previous to actually DO something before killing them with cancel()
 	time.Sleep(1 * time.Second)
@@ -117,10 +118,9 @@ func TestGather(t *testing.T) {
 
 	// confirm that we got shutdown message in log
 	messagesShouldBe := []string{
-		"msg=\"http listener stopping\"",
-		"msg=\"http listener stopped\"",
-		"msg=\"server stopped\"",
-		"msg=\"this is a bad error\"",
+		"http listener stopping",
+		"http listener stopped",
+		"this is a bad error",
 	}
 	for _, message := range messagesShouldBe {
 		assert.Contains(t, string(logOutput.Bytes()), message)

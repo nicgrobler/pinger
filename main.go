@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	gelf "github.com/Graylog2/go-gelf/gelf"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -34,10 +34,10 @@ type config struct {
 	Port                   string
 }
 
-type peers map[string]int
+type peers []string
 
-func getValidPeerList(c *config) (peers, error) {
-	p := make(peers)
+func getValidPeerList(c config) (peers, error) {
+	var p peers
 	// get my own hostname
 	myName, err := getHostName()
 	if err != nil {
@@ -68,12 +68,20 @@ func getValidPeerList(c *config) (peers, error) {
 		return p, errors.New("failed to get tasks: " + err.Error())
 	}
 
-	// build list of task ips, that do not include our own
+	/*
+		build list of task ips, that do not include our own.
+		essentially a left-outer-join.
+
+		could use maps but the allocations and hit on the GC is far lower with slices, and due to the small
+		size, a range-basedloop is faster
+	*/
 	for _, ip := range others {
 		ipString := ip.String()
-		_, found := ips[ipString]
-		if !found {
-			p[ipString] = 1
+		for _, myip := range ips {
+			if ipString == myip {
+				continue
+			}
+			p = append(p, ipString)
 		}
 	}
 
@@ -116,7 +124,7 @@ func setLogging(graylogAddr string, logOutPut io.Writer) {
 
 	} else {
 		log.SetOutput(logOutPut)
-		log.Info("no graylog url supplied, will only log to default")
+		log.Println("no graylog url supplied, will only log to default")
 	}
 }
 
@@ -127,9 +135,9 @@ func alerter(c context.Context, errorChannel chan error) {
 			// this can be sent to the destination URL
 			message := err.Error()
 			if message[0] == ERROR_PREFIX[0] {
-				log.Error(message)
+				log.Println(message)
 			} else {
-				log.Info(message)
+				log.Println(message)
 			}
 		case <-c.Done():
 			return
@@ -141,8 +149,8 @@ func getHostName() (string, error) {
 	return os.Hostname()
 }
 
-func getMyIPs(name string) (map[string]string, error) {
-	ips := make(map[string]string)
+func getMyIPs(name string) ([]string, error) {
+	var ips []string
 
 	myIPs, err := net.LookupIP(name)
 	if err != nil {
@@ -150,7 +158,7 @@ func getMyIPs(name string) (map[string]string, error) {
 	}
 	for i := range myIPs {
 		x := myIPs[i].String()
-		ips[x] = x
+		ips = append(ips, x)
 	}
 	return ips, nil
 }
@@ -273,10 +281,12 @@ func main() {
 
 	go func(w *sync.WaitGroup) {
 		startServer(ctx, c, errorChannel)
+		log.Println("server stopped")
 		wg.Done()
 	}(&wg)
 	go func(w *sync.WaitGroup) {
-		startClient(ctx, c, errorChannel)
+		startClient(ctx, *c, errorChannel)
+		log.Println("client stopped")
 		wg.Done()
 	}(&wg)
 	// now block and wait
